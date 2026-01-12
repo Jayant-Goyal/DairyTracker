@@ -19,48 +19,26 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
 
-    # Create the dummy file needed for Firebase compilation
+    # Create dummy google-services.json to bypass build check
     - name: Create dummy google-services.json
       run: |
         cat <<EOT >> app/google-services.json
         {
-          "project_info": {
-            "project_number": "123456789012",
-            "project_id": "dummy-project-id",
-            "storage_bucket": "dummy-project-id.appspot.com"
-          },
-          "client": [
-            {
-              "client_info": {
-                "mobilesdk_app_id": "1:123456789012:android:321abc456def7890",
-                "android_client_info": {
-                  "package_name": "com.example.milktracker"
-                }
-              },
-              "oauth_client": [],
-              "api_key": [
-                {
-                  "current_key": "dummy-api-key"
-                }
-              ],
-              "services": {
-                "appinvite_service": {
-                  "other_platform_oauth_client": []
-                }
-              }
-            }
-          ],
+          "project_info": { "project_number": "123", "project_id": "dummy", "storage_bucket": "dummy" },
+          "client": [{ "client_info": { "mobilesdk_app_id": "1:123:android:123", "android_client_info": { "package_name": "com.example.milktracker" }}, "api_key": [{ "current_key": "dummy" }] }],
           "configuration_version": "1"
         }
         EOT
 
-    # FIX: Install Gradle explicitly since the wrapper script is missing
+    # Setup Gradle 8.5 with caching DISABLED to prevent service errors
     - name: Setup Gradle
       uses: gradle/gradle-build-action@v2
       with:
         gradle-version: '8.5'
+        cache-read-only: false
+        cache-write-only: false
+        cache-disabled: true
 
-    # FIX: Run build using the installed 'gradle' command directly
     - name: Build APK
       run: gradle assembleDebug
 
