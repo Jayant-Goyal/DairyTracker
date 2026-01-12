@@ -19,7 +19,10 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
 
-    # Create dummy google-services.json to bypass build check
+    # DEBUG: Show file structure to check for path errors
+    - name: List Files
+      run: find . -maxdepth 5 -not -path '*/.*'
+
     - name: Create dummy google-services.json
       run: |
         cat <<EOT >> app/google-services.json
@@ -30,7 +33,6 @@ jobs:
         }
         EOT
 
-    # Setup Gradle 8.5 with caching DISABLED to prevent service errors
     - name: Setup Gradle
       uses: gradle/gradle-build-action@v2
       with:
@@ -47,3 +49,5 @@ jobs:
       with:
         name: milk-tracker-debug
         path: app/build/outputs/apk/debug/app-debug.apk
+
+
