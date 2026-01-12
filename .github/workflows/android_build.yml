@@ -19,6 +19,7 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
 
+    # Create the dummy file needed for Firebase compilation
     - name: Create dummy google-services.json
       run: |
         cat <<EOT >> app/google-services.json
@@ -53,13 +54,15 @@ jobs:
         }
         EOT
 
-    - name: Make Gradle executable
-      run: chmod +x gradlew || true
-
-    - name: Build with Gradle
+    # FIX: Install Gradle explicitly since the wrapper script is missing
+    - name: Setup Gradle
       uses: gradle/gradle-build-action@v2
       with:
-        arguments: assembleDebug
+        gradle-version: '8.5'
+
+    # FIX: Run build using the installed 'gradle' command directly
+    - name: Build APK
+      run: gradle assembleDebug
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
