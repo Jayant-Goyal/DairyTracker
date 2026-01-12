@@ -1,4 +1,4 @@
-name: Fix and Build Android APK
+name: Aggressive Fix and Build
 
 on:
   push:
@@ -19,79 +19,111 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
 
-    # --- NUCLEAR AUTO-FIX STEP ---
-    - name: Auto-Fix All Missing Configs
+    # --- AGGRESSIVE AUTO-FIX STEP ---
+    - name: Force Overwrite Build Configs
       run: |
-        echo "🔧 Starting Nuclear Auto-Fix..."
+        echo "🔥 Starting Aggressive Auto-Fix..."
 
-        # 1. GENERATE ROOT BUILD.GRADLE (Often missing!)
-        if [ ! -f build.gradle.kts ] && [ ! -f build.gradle ]; then
-          echo "⚠️ Missing ROOT build.gradle, creating it..."
-          cat <<EOF > build.gradle
+        # 1. DELETE POTENTIALLY BROKEN FILES (Kotlin DSL & Groovy)
+        rm -f build.gradle.kts build.gradle settings.gradle.kts settings.gradle gradle.properties
+        rm -f app/build.gradle.kts app/build.gradle
+
+        # 2. CREATE ROBUST ROOT BUILD.GRADLE
+        echo "📝 Creating clean Root build.gradle..."
+        cat <<EOF > build.gradle
         buildscript {
             repositories { google(); mavenCentral() }
             dependencies {
                 classpath 'com.android.tools.build:gradle:8.2.0'
                 classpath 'com.google.gms:google-services:4.4.0'
+                classpath 'org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.20'
             }
         }
         allprojects { repositories { google(); mavenCentral() } }
         task clean(type: Delete) { delete rootProject.buildDir }
         EOF
-        fi
 
-        # 2. GENERATE SETTINGS.GRADLE
-        if [ ! -f settings.gradle.kts ] && [ ! -f settings.gradle ]; then
-          echo "⚠️ Missing settings.gradle, creating it..."
-          echo "pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }" > settings.gradle
-          echo "dependencyResolutionManagement { repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS); repositories { google(); mavenCentral() } }" >> settings.gradle
-          echo "rootProject.name = 'MilkTracker'" >> settings.gradle
-          echo "include ':app'" >> settings.gradle
-        fi
+        # 3. CREATE ROBUST SETTINGS.GRADLE
+        echo "📝 Creating clean settings.gradle..."
+        cat <<EOF > settings.gradle
+        pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }
+        dependencyResolutionManagement { repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS); repositories { google(); mavenCentral() } }
+        rootProject.name = 'MilkTracker'
+        include ':app'
+        EOF
 
-        # 3. GENERATE GRADLE.PROPERTIES
-        if [ ! -f gradle.properties ]; then
-          echo "⚠️ Missing gradle.properties, creating it..."
-          echo "org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8" > gradle.properties
-          echo "android.useAndroidX=true" >> gradle.properties
-          echo "android.enableJetifier=true" >> gradle.properties
-        fi
+        # 4. CREATE ROBUST APP-LEVEL BUILD.GRADLE
+        echo "📝 Creating clean App build.gradle..."
+        cat <<EOF > app/build.gradle
+        plugins {
+            id 'com.android.application'
+            id 'org.jetbrains.kotlin.android'
+            id 'com.google.gms.google-services'
+        }
 
-        # 4. FIX FOLDER STRUCTURE (Move loose files)
+        android {
+            namespace 'com.example.milktracker'
+            compileSdk 34
+
+            defaultConfig {
+                applicationId "com.example.milktracker"
+                minSdk 24
+                targetSdk 34
+                versionCode 1
+                versionName "1.0"
+            }
+
+            buildTypes {
+                release {
+                    minifyEnabled false
+                    proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+                }
+            }
+            compileOptions {
+                sourceCompatibility JavaVersion.VERSION_1_8
+                targetCompatibility JavaVersion.VERSION_1_8
+            }
+            kotlinOptions {
+                jvmTarget = '1.8'
+            }
+            buildFeatures {
+                viewBinding true
+            }
+            lint {
+                abortOnError false
+                checkReleaseBuilds false
+            }
+        }
+
+        dependencies {
+            implementation 'androidx.core:core-ktx:1.12.0'
+            implementation 'androidx.appcompat:appcompat:1.6.1'
+            implementation 'com.google.android.material:material:1.11.0'
+            implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+            implementation platform('com.google.firebase:firebase-bom:32.7.0')
+            implementation 'com.google.firebase:firebase-firestore'
+        }
+        EOF
+
+        # 5. CREATE GRADLE.PROPERTIES
+        echo "org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8" > gradle.properties
+        echo "android.useAndroidX=true" >> gradle.properties
+        echo "android.enableJetifier=true" >> gradle.properties
+
+        # 6. FIX FOLDER STRUCTURE (Move loose files)
         PACKAGE_DIR="app/src/main/java/com/example/milktracker"
         mkdir -p $PACKAGE_DIR
         
-        if [ -f app/src/main/java/MainActivity.kt ]; then
-          echo "📦 Moving MainActivity.kt..."
-          mv app/src/main/java/MainActivity.kt $PACKAGE_DIR/
-        fi
-        if [ -f app/src/main/java/MilkWidgetProvider.kt ]; then
-          echo "📦 Moving MilkWidgetProvider.kt..."
-          mv app/src/main/java/MilkWidgetProvider.kt $PACKAGE_DIR/
-        fi
+        # Move Kotlin files if found in wrong place
+        [ -f app/src/main/java/MainActivity.kt ] && mv app/src/main/java/MainActivity.kt $PACKAGE_DIR/
+        [ -f app/src/main/java/MilkWidgetProvider.kt ] && mv app/src/main/java/MilkWidgetProvider.kt $PACKAGE_DIR/
 
-        # 5. GENERATE DUMMY RESOURCES (Prevents 'Resource not found' errors)
+        # 7. GENERATE DUMMY RESOURCES (Safe overwrite)
         mkdir -p app/src/main/res/values
+        echo '<resources><string name="app_name">Milk Tracker</string><string name="widget_loading">Loading...</string><string name="title_activity_main">Milk Tracker</string></resources>' > app/src/main/res/values/strings.xml
+        echo '<resources><style name="Theme.MilkTracker" parent="Theme.Material3.DayNight.NoActionBar"><item name="colorPrimary">@android:color/holo_blue_light</item></style></resources>' > app/src/main/res/values/themes.xml
         
-        # Strings
-        if [ ! -f app/src/main/res/values/strings.xml ]; then
-           echo "⚠️ Creating default strings.xml..."
-           echo '<resources><string name="app_name">Milk Tracker</string><string name="widget_loading">Loading...</string></resources>' > app/src/main/res/values/strings.xml
-        fi
-        
-        # Themes (Critical for build)
-        if [ ! -f app/src/main/res/values/themes.xml ]; then
-           echo "⚠️ Creating default themes.xml..."
-           echo '<resources><style name="Theme.MilkTracker" parent="Theme.Material3.DayNight.NoActionBar"><item name="colorPrimary">@android:color/holo_blue_light</item></style></resources>' > app/src/main/res/values/themes.xml
-        fi
-        
-        # Colors
-        if [ ! -f app/src/main/res/values/colors.xml ]; then
-           echo '<resources><color name="purple_200">#FFBB86FC</color></resources>' > app/src/main/res/values/colors.xml
-        fi
-
-        # 6. GENERATE DUMMY GOOGLE-SERVICES.JSON
-        mkdir -p app
+        # 8. GENERATE DUMMY GOOGLE-SERVICES.JSON
         cat <<EOT > app/google-services.json
         {
           "project_info": { "project_number": "000", "project_id": "dummy", "storage_bucket": "dummy" },
@@ -100,7 +132,7 @@ jobs:
         }
         EOT
         
-        echo "✅ Nuclear Auto-Fix Complete."
+        echo "✅ Aggressive Fix Complete."
 
     # --- BUILD STEP ---
     - name: Setup Gradle
@@ -110,7 +142,7 @@ jobs:
         cache-disabled: true
 
     - name: Build APK
-      run: gradle assembleDebug --stacktrace --info
+      run: gradle assembleDebug --stacktrace
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
