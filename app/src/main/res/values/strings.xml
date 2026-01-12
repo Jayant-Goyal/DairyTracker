@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">Milk Tracker</string>
+    <string name="title_activity_main">Milk Tracker</string>
+    <string name="widget_loading">Loading...</string>
+</resources>
