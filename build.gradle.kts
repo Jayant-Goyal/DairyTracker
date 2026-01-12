@@ -1,4 +1,4 @@
-// Path: build.gradle.kts
+// This file must be in the ROOT of the repo, NOT in app/
 buildscript {
     repositories {
         google()
@@ -16,3 +16,5 @@ allprojects {
         mavenCentral()
     }
 }
+
+
