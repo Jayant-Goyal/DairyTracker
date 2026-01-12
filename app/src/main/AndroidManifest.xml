@@ -11,7 +11,7 @@
         android:label="Milk Tracker"
         android:roundIcon="@drawable/ic_milk_icon"
         android:supportsRtl="true"
-        android:theme="@style/Theme.Material3.DayNight.NoActionBar"
+        android:theme="@style/Theme.MilkTracker"
         tools:targetApi="31">
         
         <activity
