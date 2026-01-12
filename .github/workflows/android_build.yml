@@ -1,4 +1,4 @@
-name: Build Android APK
+name: Fix and Build Android APK
 
 on:
   push:
@@ -19,30 +19,67 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
 
-    # DEBUG: Show file structure to check for path errors
-    - name: List Files
-      run: find . -maxdepth 5 -not -path '*/.*'
-
-    - name: Create dummy google-services.json
+    # --- SELF-REPAIR STEP: Fix Folder Structure & Configs ---
+    - name: Auto-Fix Project Structure
       run: |
-        cat <<EOT >> app/google-services.json
+        echo "🔧 Starting Auto-Fix..."
+
+        # 1. Ensure settings.gradle exists (Crucial for finding the app module)
+        if [ ! -f settings.gradle.kts ] && [ ! -f settings.gradle ]; then
+          echo "⚠️ Missing settings.gradle, creating it..."
+          echo 'pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }' > settings.gradle.kts
+          echo 'dependencyResolutionManagement { repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS); repositories { google(); mavenCentral() } }' >> settings.gradle.kts
+          echo 'rootProject.name = "MilkTracker"' >> settings.gradle.kts
+          echo 'include(":app")' >> settings.gradle.kts
+        fi
+
+        # 2. Ensure gradle.properties exists
+        if [ ! -f gradle.properties ]; then
+          echo "⚠️ Missing gradle.properties, creating it..."
+          echo 'org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8' > gradle.properties
+          echo 'android.useAndroidX=true' >> gradle.properties
+          echo 'android.enableJetifier=true' >> gradle.properties
+        fi
+
+        # 3. Fix Kotlin Package Structure
+        # Users often put files in app/src/main/java/ instead of app/src/main/java/com/example/milktracker/
+        PACKAGE_DIR="app/src/main/java/com/example/milktracker"
+        mkdir -p $PACKAGE_DIR
+        
+        # Move MainActivity.kt if it's in the wrong place
+        if [ -f app/src/main/java/MainActivity.kt ]; then
+          echo "📦 Moving MainActivity.kt to correct package folder..."
+          mv app/src/main/java/MainActivity.kt $PACKAGE_DIR/
+        fi
+        
+        # Move MilkWidgetProvider.kt if it's in the wrong place
+        if [ -f app/src/main/java/MilkWidgetProvider.kt ]; then
+          echo "📦 Moving MilkWidgetProvider.kt to correct package folder..."
+          mv app/src/main/java/MilkWidgetProvider.kt $PACKAGE_DIR/
+        fi
+
+        # 4. Generate Dummy Google Services JSON
+        echo "📄 Generating dummy google-services.json..."
+        cat <<EOT > app/google-services.json
         {
-          "project_info": { "project_number": "123", "project_id": "dummy", "storage_bucket": "dummy" },
-          "client": [{ "client_info": { "mobilesdk_app_id": "1:123:android:123", "android_client_info": { "package_name": "com.example.milktracker" }}, "api_key": [{ "current_key": "dummy" }] }],
+          "project_info": { "project_number": "000000000000", "project_id": "dummy", "storage_bucket": "dummy" },
+          "client": [{ "client_info": { "mobilesdk_app_id": "1:000000000000:android:0000000000000000", "android_client_info": { "package_name": "com.example.milktracker" }}, "api_key": [{ "current_key": "dummy" }] }],
           "configuration_version": "1"
         }
         EOT
+        
+        echo "✅ Auto-Fix Complete."
 
+    # --- BUILD STEP ---
     - name: Setup Gradle
       uses: gradle/gradle-build-action@v2
       with:
         gradle-version: '8.5'
-        cache-read-only: false
-        cache-write-only: false
         cache-disabled: true
 
-    - name: Build APK
-      run: gradle assembleDebug
+    - name: Build APK (with Stacktrace)
+      # Adding --stacktrace and --info helps us see the REAL error if it fails
+      run: gradle assembleDebug --stacktrace --info
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
